@@ -6,11 +6,13 @@
 import psycopg2
 from operator import itemgetter
 
-MAIN_TOURNAMENT='MAIN_TOURNAMENT'
+MAIN_TOURNAMENT = 'MAIN_TOURNAMENT'
+
 
 def connect():
     """Connect to the PostgreSQL database.  Returns a database connection."""
     return psycopg2.connect("dbname=tournament")
+
 
 def deleteAllMatches():
     """Remove all the match records from the database."""
@@ -79,7 +81,8 @@ def countPlayers(tournament=MAIN_TOURNAMENT):
     if tournamentExists(tournament):
         tid = getTournamentId(tournament)
 
-        c.execute("SELECT count(*) FROM PlayersTournaments where tid=%s", (tid,))
+        c.execute(
+            "SELECT count(*) FROM PlayersTournaments where tid=%s", (tid,))
         count = c.fetchone()[0]
         DB.close()
 
@@ -125,7 +128,7 @@ def playerExistsInTournament(pid, tid):
     count = c.fetchone()[0]
     DB.close()
 
-    return count  
+    return count
 
 
 def getPlayerId(name):
@@ -165,6 +168,7 @@ def tournamentExists(name):
 
     return count
 
+
 def getTournamentId(name):
     """Gets the tournament id.
 
@@ -181,7 +185,7 @@ def getTournamentId(name):
     tid = c.fetchone()[0]
     DB.close()
 
-    return tid       
+    return tid
 
 
 def registerPlayer(name, tournament=MAIN_TOURNAMENT):
@@ -206,21 +210,24 @@ def registerPlayer(name, tournament=MAIN_TOURNAMENT):
     if playerExists(name) == False:
         c.execute("INSERT INTO Players (name) VALUES (%s)", (name,))
         DB.commit()
-    
+
     # Get player id
-    pid = getPlayerId(name);
+    pid = getPlayerId(name)
 
     # Get tournament id
-    tid = getTournamentId(tournament);
+    tid = getTournamentId(tournament)
 
     # Make sure the player does not exist yet in the tournament.
     if playerExistsInTournament(pid, tid) == False:
         # Insert entry into PlayersTournaments table
-        c.execute("INSERT INTO PlayersTournaments (pid, tid) VALUES (%s, %s)", ((pid,), (tid,)))
+        c.execute(
+            "INSERT INTO PlayersTournaments (pid, tid) VALUES (%s, %s)",
+            ((pid,), (tid,)))
         DB.commit()
     else:
         raise ValueError(
-            "Player {name} already exists in tournament. Please check.".format(name=name))
+            "Player {name} already exists in tournament. Please check."
+            .format(name=name))
 
     DB.close()
 
@@ -249,12 +256,16 @@ def playerStandings(tournament=MAIN_TOURNAMENT):
 
     tid = getTournamentId(tournament)
 
-    c.execute("SELECT p.id, p.name, COALESCE(pwins.wins,0) AS wins, " + 
+    c.execute("SELECT p.id, p.name, COALESCE(pwins.wins,0) AS wins, " +
               "COALESCE(plosses.losses, 0) AS losses FROM Players AS p " +
-              "RIGHT JOIN (SELECT pid, tid FROM PlayersTournaments WHERE tid = %s) AS pt ON p.id = pt.pid " +
-              "LEFT JOIN (SELECT * FROM PlayerWins WHERE tid = %s) AS pwins ON p.id = pwins.pid " +
-              "LEFT JOIN (SELECT * FROM PlayerLosses WHERE tid = %s) AS plosses ON p.id = plosses.pid " +
-              "ORDER BY wins DESC, id ASC", ((tid,), (tid,), (tid,)));
+              "RIGHT JOIN (SELECT pid, tid FROM PlayersTournaments " +
+              "WHERE tid = %s) " +
+              "AS pt ON p.id = pt.pid " +
+              "LEFT JOIN (SELECT * FROM PlayerWins WHERE tid = %s) " +
+              "AS pwins ON p.id = pwins.pid " +
+              "LEFT JOIN (SELECT * FROM PlayerLosses WHERE tid = %s) " +
+              "AS plosses ON p.id = plosses.pid " +
+              "ORDER BY wins DESC, id ASC", ((tid,), (tid,), (tid,)))
 
     rows = c.fetchall()
     for row in rows:
@@ -288,7 +299,8 @@ def matchExists(winner, loser, tournament=MAIN_TOURNAMENT):
     DB = connect()
     c = DB.cursor()
     c.execute("SELECT count(*) FROM Matches WHERE " +
-              "tid = %s AND ((winner=%s and loser=%s) OR (winner=%s and loser=%s))",
+              "tid = %s AND ((winner=%s and loser=%s) " +
+              "OR (winner=%s and loser=%s))",
               ((tid,), (winner,), (loser,), (loser,), (winner,)))
     count = c.fetchone()[0]
     DB.close()
@@ -314,7 +326,8 @@ def reportMatch(winner, loser, tournament=MAIN_TOURNAMENT):
         c = DB.cursor()
 
         # Insert winner/loser record
-        c.execute("INSERT INTO Matches (winner, loser, tid) VALUES (%s, %s, %s)",
+        c.execute("INSERT INTO Matches (winner, loser, tid) " +
+                  "VALUES (%s, %s, %s)",
                   ((winner,), (loser,), (tid,)))
         DB.commit()
 
@@ -333,7 +346,7 @@ def givePlayerBye(player, tournament=MAIN_TOURNAMENT):
       player:  the id number of the player who got bye and automatic win.
       tournament: name of the tournament where the player is participating.
     """
-    #print "player {player} gets a bye!".format(player=player)
+    # print "player {player} gets a bye!".format(player=player)
     reportMatch(player, 0, tournament)
 
 
@@ -374,10 +387,11 @@ def swissPairings(tournament=MAIN_TOURNAMENT):
             pairing = (pair1[0], pair1[1], pair2[0], pair2[1])
             pairings.append(pairing)
             index += 2
-    # Odd number of players        
+    # Odd number of players
     else:
         # Step 1, go thru the select the player id in the standings without bye
-        c.execute("SELECT pid FROM PlayersWithoutBye WHERE tid=%s LIMIT 1", (tid,))
+        c.execute(
+            "SELECT pid FROM PlayersWithoutBye WHERE tid=%s LIMIT 1", (tid,))
         player_id = c.fetchone()[0]
 
         # Step 2, give the player a bye and an automatic win for the player.
@@ -386,7 +400,9 @@ def swissPairings(tournament=MAIN_TOURNAMENT):
         # Step 3, Return the pairing without the player with bye.
         standings = playerStandings(tournament)
         # Remove from the result the player id who was given a bye. See step 2.
-        standings = [(pid, name, wins, matches) for pid, name, wins, matches in standings if pid != player_id]
+        standings = [(pid, name, wins, matches)
+                     for pid, name, wins, matches in standings
+                     if pid != player_id]
         count = len(standings)
 
         index = 0

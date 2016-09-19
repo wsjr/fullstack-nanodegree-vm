@@ -7,6 +7,7 @@
 # as appropriate to account for your module's added functionality.
 
 from tournament import *
+from operator import itemgetter
 
 def testCount():
     """
@@ -147,9 +148,203 @@ def testPairings():
     print "10. After one match, players with one win are properly paired."
 
 
+# Below are added tests for the following (1) Rematches, (2) Odd number of pairings and (3) Different tournament.
+
+def testRematches():
+    """
+    Test that pairings are not supposed to rematch or play twice.
+    """
+    deleteMatches()
+    deletePlayers()
+
+    registerPlayer("Player A")
+    registerPlayer("Player B")
+    standings = playerStandings()
+    [id1, id2] = [row[0] for row in standings]
+    pairings = swissPairings()
+    if len(pairings) != 1:
+        raise ValueError(
+            "For two players, swissPairings should return 1 pair. Got {pairs}".format(pairs=len(pairings)))
+    
+    result = reportMatch(id1, id2)
+    if (result == False):
+        raise ValueError(
+            "{id1} and {id2} should have been a valid match. Got invalid match".format(id1=id1, id2=id2))
+
+    result = reportMatch(id1, id2)
+    if (result == True):
+        raise ValueError(
+            "{id1} and {id2} should have been a rematched and NOT a valid match. Got valid match".format(id1=id1, id2=id2))
+
+
+def checkStandings(standings, expected_wins):
+    """
+    Utility function to test the player wins against expected wins.
+    """
+    index = 0
+    for row in standings:
+        pid = row[0]
+        name = row[1]
+        wins = row[2]
+
+        if (wins != expected_wins[index]):
+            raise ValueError("Player {name} should have gotten {wins} win. " + 
+                             "Got {expected_wins} wins instead.".format(name=name, 
+                                                                        wins=wins, 
+                                                                        expected_wins=expected_wins))
+        index += 1
+
+
+def testOddNumberOfPlayers():
+    """
+    Test that pairings odd number of players with the use "bye" mechanism.
+    """
+    deleteMatches()
+    deletePlayers()
+
+    # Check odd number of players, introduce "BYE"
+    registerPlayer("A")
+    registerPlayer("B")
+    registerPlayer("C")
+    standings = playerStandings()
+    [id1, id2, id3] = [row[0] for row in standings]
+
+    # Input: Give 'A' a bye (inside swiss pairings), B wins against C.
+    pairings = swissPairings()
+    playerStandings()
+    if len(pairings) != 1:
+        raise ValueError(
+            "For 3 players, swissPairings should return 1 pair. Got {pairs}".format(pairs=len(pairings)))
+    [(pid1, pname1, pid2, pname2)] = pairings
+    reportMatch(pid1, pid2)
+
+    # Output: 
+    # -------------
+    #  Name | W | L 
+    # -------------
+    #   A   | 1 | 0
+    #   B   | 1 | 0
+    #   C   | 0 | 1 
+    standings = playerStandings()
+    standings.sort(key=itemgetter(2), reverse=True)
+    checkStandings(standings, [1, 1, 0])   
+
+    # Input: Give 'B' a bye (inside swiss pairings), C wins against A.
+    pairings = swissPairings()
+    playerStandings()
+    if len(pairings) != 1:
+        raise ValueError(
+            "For 3 players, swissPairings should return 1 pair. Got {pairs}".format(pairs=len(pairings)))
+    [(pid1, pname1, pid2, pname2)] = pairings
+    reportMatch(pid2, pid1)
+    
+    # Output: 
+    # -------------
+    #  Name | W | L 
+    # -------------
+    #   B   | 2 | 0
+    #   A   | 1 | 1
+    #   C   | 1 | 1 
+    standings = playerStandings()
+    standings.sort(key=itemgetter(2), reverse=True)
+    checkStandings(standings, [2, 1, 1]) 
+
+    # Input: Give 'C' a bye (inside swiss pairings), B wins against A.
+    pairings = swissPairings()
+    playerStandings()
+    if len(pairings) != 1:
+        raise ValueError(
+            "For 3 players, swissPairings should return 1 pair. Got {pairs}".format(pairs=len(pairings)))
+    [(pid1, pname1, pid2, pname2)] = pairings
+    reportMatch(pid1, pid2)
+
+    # Output: 
+    # -------------
+    #  Name | W | L 
+    # -------------
+    #   B   | 3 | 0
+    #   C   | 2 | 1
+    #   A   | 1 | 2 
+    standings = playerStandings()
+    standings.sort(key=itemgetter(2), reverse=True)
+    checkStandings(standings, [3, 2, 1]) 
+
+
+def testDifferentTournaments():
+    """
+    Test it can handle multiple tournaments
+    """
+    deleteAllMatches()
+    deleteAllPlayers()
+
+    # Register A, B, C, A1 and B1 in Main Tournament
+    registerPlayer("A")
+    registerPlayer("B")
+    registerPlayer("C")
+    registerPlayer("A1")
+    registerPlayer("B1")
+    standings = playerStandings()
+    [id1, id2, id3, id4, id5] = [row[0] for row in standings]
+
+    # Input: Give 'A' a bye (inside swiss pairings), B wins vs C, A1 wins vs. B1
+    pairings = swissPairings()
+    playerStandings()
+    if len(pairings) != 2:
+        raise ValueError(
+            "For 5 players, swissPairings should return 2 pairs. Got {pairs}".format(pairs=len(pairings)))
+    [(pid1, pname1, pid2, pname2),(pid3, pname3, pid4, pname4)] = pairings
+    reportMatch(pid1, pid2)
+    reportMatch(pid3, pid4)
+
+    # Output: 
+    # -------------
+    #  Name | W | L 
+    # -------------
+    #   A   | 1 | 0
+    #   B   | 1 | 0
+    #   C   | 0 | 1 
+    #   A1  | 1 | 0
+    #   B1  | 0 | 1
+    standings = playerStandings()
+    standings.sort(key=itemgetter(2), reverse=True)
+    checkStandings(standings, [1, 1, 1, 0, 0]) 
+
+
+
+    # Register A, B, C in T1 Tournament
+    registerPlayer("A1", "T1")
+    registerPlayer("B1", "T1")
+    registerPlayer("C1", "T1")
+    standings = playerStandings("T1")
+    [id1, id2, id3] = [row[0] for row in standings]
+     # Input: Give 'A1' a bye (inside swiss pairings), B1 wins vs C1
+    pairings = swissPairings("T1")
+    standings = playerStandings("T1")
+    if len(pairings) != 1:
+        raise ValueError(
+            "For 3 players, swissPairings should return 1 pairs. Got {pairs}".format(pairs=len(pairings)))
+    [(pid1, pname1, pid2, pname2)] = pairings
+    reportMatch(pid1, pid2, "T1")
+
+    # Output: 
+    # ---------------
+    #  Name  | W | L 
+    # ---------------
+    #   A1   | 1 | 0
+    #   B1   | 1 | 0
+    #   C1   | 0 | 1 
+    standings = playerStandings("T1")
+    standings.sort(key=itemgetter(2), reverse=True)
+    checkStandings(standings, [1, 1, 0]) 
+
+
 if __name__ == '__main__':
     testCount()
     testStandingsBeforeMatches()
     testReportMatches()
     testPairings()
+    testRematches()
+    testOddNumberOfPlayers()
+    testDifferentTournaments()
+
     print "Success!  All tests pass!"
